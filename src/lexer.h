@@ -71,3 +71,4 @@ typedef struct {
 
 Lexer lexer_new(String src);
 bool lexer_next(Lexer* l, Token* t_out);
+bool lexer_next_filtered(Lexer* l, Token* t_out);

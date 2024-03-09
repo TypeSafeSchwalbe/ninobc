@@ -43,7 +43,11 @@ bool lexer_next(Lexer* l, Token* t_out) {
     if(l->i >= l->src.length) { return false; }
     char start = string_char_at(l->src, l->i);
     // integers and floats
-    if(start == '+' || start == '-' || is_digit(start)) {
+    bool is_sign = start == '+' || start == '-';
+    bool is_number = (is_sign && l->src.length >= l->i + 2
+        && is_digit(string_char_at(l->src, l->i + 1)))
+        || is_digit(start);
+    if(is_number) {
         size_t end = l->i + 1;
         TokenType type = INTEGER;
         while(end < l->src.length
@@ -73,13 +77,13 @@ bool lexer_next(Lexer* l, Token* t_out) {
             l->i = end; \
             return true; \
         }
-    // lex_while(is_alphanumeral, IDENTIFIER)
+    lex_while(is_alphanumeral, IDENTIFIER)
     lex_while(is_whitespace, WHITESPACE)
-    // if(l->src.length >= l->i + 2 && string_starts_with(
-    //     string_slice(l->src, l->i, l->src.length), string_wrap_nt("//")
-    // )) {
-    //     lex_while(is_not_line_end, COMMENT)
-    // }
+    if(l->src.length >= l->i + 2 && string_starts_with(
+        string_slice(l->src, l->i, l->src.length), string_wrap_nt("//")
+    )) {
+        lex_while(is_not_line_end, COMMENT)
+    }
     // multi-char tokens
     #define lex_multi(s, t) { \
             String c = string_wrap_nt(s); \
@@ -147,4 +151,14 @@ bool lexer_next(Lexer* l, Token* t_out) {
         lex_single('.', DOT)
     }
     panic("Unable to tokenize input!");
+}
+
+bool lexer_next_filtered(Lexer* l, Token* t_out) {
+    Token t;
+    while(lexer_next(l, &t)) {
+        if(t.type == WHITESPACE || t.type == COMMENT) { continue; }
+        *t_out = t;
+        return true;
+    }
+    return false;
 }
