@@ -1,0 +1,72 @@
+
+// this is a comment
+
+mod some::cool::module // module declaration
+
+// operators:
+// + - * / %  => arithmetic
+// & | ^ >> << ~  => bitwise
+// && || !  => logical
+// @  => deref
+// &  => address of
+// as  => type conversion (number types and `addr`)
+
+// types
+// u8 u16 u32 u64 usize  => unsigned integers
+// s8 s16 s32 s64 ssize  => signed integers
+// f32 f64  => floats
+// unit  => unit type
+// addr[T]  => address of some type T
+
+// literals
+// unit  => unit value
+// 25  => integer
+// 25.0  => float
+// 'x'  => character (= u8)
+// "hello"  => string  (= addr[u8])
+// T  => (T = any type) size of type
+
+
+fun cool_function { // function without arguments, implicitly returns `unit`
+}
+
+pub fun add x s32 y s32 -> s32 { // function with two args and return value
+    return x + y;
+}
+
+ext fun malloc n usize -> addr[unit] = malloc;
+ext fun free p addr[unit] = free;
+
+pub fun cool::test { // this function is in the module `some::cool::module::test`
+    var p addr[s32] = malloc s32 as addr[s32]; // a type as an expression evaluates to its size
+    @p = 0; // deref with '@'
+    free (p as addr[s32]);
+}
+
+pub record Cat name addr[u8] age u8;
+
+ext fun puts t addr[c::char] -> c::int = puts;
+
+fun cat_example {
+    var my_cat Cat = Cat "Cookie" 4;
+    puts (my_cat.name as addr[c::char]);
+}
+
+template[T] // templates can be used for functions and records
+fun sub a T b T -> T {
+    return a - b;
+}
+
+fun template_example {
+    var x s32 = 25;
+    var y s32 = -5;
+    var z s32 = sub[s32] x y;
+}
+
+template[T]
+pub record Box val T;
+
+fun another_example {
+    var b Box[Cat] = Box (Cat "Snowball" 6);
+    puts (b.val.name as addr[c::char]);
+}
