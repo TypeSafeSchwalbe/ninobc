@@ -27,6 +27,12 @@ mod some::cool::module // module declaration
 // T  => (T = any type) size of type
 
 
+//  function permissions  | calling
+// =======================|=========
+//  default               | no
+//  default (same module) | yes
+//  public                | yes
+
 fun cool_function { // function without arguments, implicitly returns `unit`
 }
 
@@ -42,6 +48,12 @@ pub fun cool::test { // this function is in the module `some::cool::module::test
     @p = 0; // deref with '@'
     free (p as addr[s32]);
 }
+
+//  record permissions    | creation | member access
+// =======================|==========|===============
+//  default               | no       | no
+//  default (same module) | yes      | yes
+//  public                | yes      | yes
 
 pub record Cat name addr[u8] age u8;
 
