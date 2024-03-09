@@ -43,6 +43,7 @@ typedef enum {
     AT,
     DOT,
     DOUBLE_COLON,
+    SEMICOLON,
     KEYWORD_MOD,
     KEYWORD_USE,
     KEYWORD_AS,
@@ -51,10 +52,10 @@ typedef enum {
     KEYWORD_RETURN,
     KEYWORD_EXT,
     KEYWORD_RECORD,
-    KEYWORD_TEMPLATE,
     KEYWORD_IF,
     KEYWORD_ELSE,
     KEYWORD_WHILE,
+    KEYWORD_VAR,
     KEYWORD_UNIT
 } TokenType;
 

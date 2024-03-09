@@ -10,11 +10,11 @@ void panic(const char* reason) {
 }
 
 
-Arena* arena_new() {
-    Arena* a = (Arena*) malloc(sizeof(Arena));
-    a->buffer_size = 1028;
-    a->current_offset = 0;
-    a->buffer = (char*) malloc(a->buffer_size);
+Arena arena_new() {
+    Arena a;
+    a.buffer_size = 1028;
+    a.current_offset = 0;
+    a.buffer = (char*) malloc(a.buffer_size);
     return a;
 }
 
@@ -63,3 +63,5 @@ String string_slice(String src, size_t offset, size_t end) {
 bool string_starts_with(String src, String prefix) {
     return memcmp(src.data, prefix.data, prefix.length) == 0;
 }
+
+
