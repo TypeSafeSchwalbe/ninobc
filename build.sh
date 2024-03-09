@@ -1,4 +1,4 @@
 
 cc \
     $(find src -name "*.c") \
-    -lm -g -o ninoi
+    -lm -g -o ninobc

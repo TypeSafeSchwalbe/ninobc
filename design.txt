@@ -7,6 +7,7 @@ mod some::cool::module // module declaration
 // + - * / %  => arithmetic
 // & | ^ >> << ~  => bitwise
 // && || !  => logical
+// == != < > <= >=  => comparison
 // @  => deref
 // &  => address of
 // as  => type conversion (number types and `addr`)
