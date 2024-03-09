@@ -42,6 +42,23 @@ static bool is_not_line_end(char c) {
 bool lexer_next(Lexer* l, Token* t_out) {
     if(l->i >= l->src.length) { return false; }
     char start = string_char_at(l->src, l->i);
+    // string literal
+    if(start == '"') {
+        size_t end = l->i;
+        bool escaped = false;
+        while(end < l->src.length
+            && (string_char_at(l->src, end) != '\"' || escaped)) {
+            escaped = !escaped && string_char_at(l->src, end) == '\\';
+            end += 1;
+        }
+        end += 1;
+        *t_out = (Token) {
+            .content = string_slice(l->src, l->i, end),
+            .type = STRING
+        };
+        l->i = end;
+        return true;
+    }
     // integers and floats
     bool is_sign = start == '+' || start == '-';
     bool is_number = (is_sign && l->src.length >= l->i + 2

@@ -11,7 +11,6 @@ typedef enum {
     IDENTIFIER,
     INTEGER,
     FLOAT,
-    CHARACTER,
     STRING,
     BRACE_OPEN,
     BRACE_CLOSE,

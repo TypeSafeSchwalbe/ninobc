@@ -23,7 +23,6 @@ mod some::cool::module // module declaration
 // unit  => unit value
 // 25  => integer
 // 25.0  => float
-// 'x'  => character (= u8)
 // "hello"  => string  (= addr[u8])
 // T  => (T = any type) size of type
 
