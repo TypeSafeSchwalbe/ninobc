@@ -38,6 +38,7 @@ bool string_starts_with(String src, String prefix);
 
 #define ArrayBuilder(t) ArrayBuilder_##t
 #define arraybuilder_new(t) arraybuilder_new_##t
+#define arraybuilder_append(t) arraybuilder_append_##t
 #define arraybuilder_push(t) arraybuilder_push_##t
 #define arraybuilder_finish(t) arraybuilder_finish_##t
 #define DEF_ARRAY_BUILDER(t) \
@@ -56,14 +57,22 @@ bool string_starts_with(String src, String prefix);
         return builder; \
     } \
     \
-    void arraybuilder_push(t)(ArrayBuilder(t)* b, t value) { \
-        size_t new_length = b->length + 1; \
-        if(new_length > b->buffer_size) { \
-            b->buffer_size *= 2; \
+    void arraybuilder_append(t)(ArrayBuilder(t)* b, size_t valuec, t* valuev) { \
+        size_t new_length = b->length + valuec; \
+        size_t new_buffer_size = b->buffer_size; \
+        while(new_length > new_buffer_size) { \
+            new_buffer_size *= 2; \
+        } \
+        if(new_buffer_size > b->buffer_size) { \
+            b->buffer_size = new_buffer_size; \
             b->buffer = (t*) realloc(b->buffer, sizeof(t) * b->buffer_size); \
         } \
-        memcpy(b->buffer + b->length, &value, sizeof(t)); \
+        memcpy(b->buffer + b->length, valuev, sizeof(t) * valuec); \
         b->length = new_length; \
+    } \
+    \
+    void arraybuilder_push(t)(ArrayBuilder(t)* b, t value) { \
+        arraybuilder_append(t)(b, 1, &value); \
     } \
     \
     void* arraybuilder_finish(t)(ArrayBuilder(t)* b, Arena* a) { \

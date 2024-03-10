@@ -4,7 +4,7 @@
 
 int main() {
     String input = string_wrap_nt(
-"malloc (sizeof balls)"
+"use cock::(and balls::*)"
     );
     Lexer lexer = lexer_new(input);
     Arena arena = arena_new();

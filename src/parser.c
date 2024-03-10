@@ -2,6 +2,11 @@
 #include <stdint.h>
 #include "parser.h"
 
+DEF_ARRAY_BUILDER(String)
+DEF_ARRAY_BUILDER(Node)
+DEF_ARRAY_BUILDER(Namespace)
+
+
 Parser parser_new(Arena* a) {
     return (Parser) {
         .arena = a
@@ -10,6 +15,7 @@ Parser parser_new(Arena* a) {
 
 static Node parse_type(Parser* p, Lexer* l);
 static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence);
+static Namespace* parse_usages(Parser* p, Lexer* l, size_t* pathc);
 static Node parse_statement(Parser* p, Lexer* l);
 static Block parse_block(Parser* p, Lexer* l);
 
@@ -43,9 +49,6 @@ static Node* alloc_node(Arena* a, Node n) {
     *p = n;
     return p;
 }
-
-DEF_ARRAY_BUILDER(String)
-DEF_ARRAY_BUILDER(Node)
 
 static Node parse_identifier(Parser* p, Lexer* l, bool force_namespace) {
     String variable_name = CURRENT.content;
@@ -149,6 +152,7 @@ static uint8_t infix_operator_precedence(TokenType t) {
         case PIPE: return P_BITWISE_OR;
         case EQUALS:
         case BRACE_OPEN:
+        case BRACE_CLOSE:
         case SEMICOLON:
         case PAREN_CLOSE:
             return P_EXPRESSION_TERMINATOR;
@@ -159,7 +163,7 @@ static uint8_t infix_operator_precedence(TokenType t) {
 static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence) {
     Node previous;
     bool has_previous = false;
-    for(;;) {
+    while(true) {
         uint8_t token_precedence = infix_operator_precedence(CURRENT.type);
         if(AT_END || token_precedence >= precedence) {
             if(!has_previous) { PARSING_ERROR(); }
@@ -376,6 +380,59 @@ static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence) {
     }
 }
 
+// use cock::(and balls::*)
+
+static Namespace* parse_usages(Parser* p, Lexer* l, size_t* pathc) {
+    switch(CURRENT.type) {
+        case PAREN_OPEN:
+            ArrayBuilder(Namespace) rb = arraybuilder_new(Namespace)();
+            EXPECT_NEXT();
+            while(CURRENT.type != PAREN_CLOSE) {
+                size_t cpathc;
+                Namespace* cpathv = parse_usages(p, l, &cpathc);
+                arraybuilder_append(Namespace)(&rb, cpathc, cpathv);
+            }
+            EXPECT_TYPE(PAREN_CLOSE);
+            TRY_NEXT();
+            *pathc = rb.length;
+            return (Namespace*) arraybuilder_finish(Namespace)(&rb, p->arena);
+        case ASTERISK:
+        case IDENTIFIER:
+            bool can_contain = CURRENT.type = IDENTIFIER;
+            String name = CURRENT.content;
+            if(!TRY_NEXT() || CURRENT.type != DOUBLE_COLON || !can_contain) {
+                String* element = (String*) arena_alloc(
+                    p->arena, sizeof(String)
+                );
+                *element = name;
+                Namespace* path = (Namespace*) arena_alloc(
+                    p->arena, sizeof(Namespace)
+                );
+                *path = (Namespace) { .length = 1, .elements = element };
+                *pathc = 1;
+                return path;
+            }
+            EXPECT_NEXT();
+            size_t fpathc;
+            Namespace* fpathv = parse_usages(p, l, &fpathc);
+            for(size_t fpathi = 0; fpathi < fpathc; fpathi += 1) {
+                Namespace old_path = fpathv[fpathi];
+                String* new_elements = (String*) arena_alloc(
+                    p->arena, sizeof(String) * old_path.length + 1
+                );
+                new_elements[0] = name;
+                memcpy(
+                    new_elements + 1, old_path.elements,
+                    sizeof(String) * old_path.length
+                );
+                fpathv[fpathi].elements = new_elements;
+                fpathv[fpathi].length = old_path.length + 1;
+            }
+            *pathc = fpathc;
+            return fpathv;
+    }
+}
+
 static Node parse_statement(Parser* p, Lexer* l) {
     switch(CURRENT.type) {
         case KEYWORD_VAR:
@@ -410,7 +467,13 @@ static Node parse_statement(Parser* p, Lexer* l) {
                 .path = path
             );
         case KEYWORD_USE: 
-            panic("TODO!");
+            EXPECT_NEXT();
+            size_t pathc;
+            Namespace* pathv = parse_usages(p, l, &pathc);
+            return CREATE_NODE(USE_NODE, use, 
+                .pathc = pathc,
+                .pathv = pathv
+            );
         case KEYWORD_PUB:
         case KEYWORD_EXT:
         case KEYWORD_FUN:
@@ -418,9 +481,147 @@ static Node parse_statement(Parser* p, Lexer* l) {
             bool is_public = CURRENT.type == KEYWORD_PUB;
             if(is_public) { EXPECT_NEXT(); }
             if(CURRENT.type == KEYWORD_EXT) {
-                panic("TODO!");
+                EXPECT_NEXT();
+                EXPECT_TYPE(KEYWORD_FUN);
+                EXPECT_NEXT();
+                EXPECT_TYPE(IDENTIFIER);
+                ArrayBuilder(String) pb = arraybuilder_new(String)();
+                arraybuilder_push(String)(&pb, CURRENT.content);
+                EXPECT_NEXT();
+                while(CURRENT.type == DOUBLE_COLON) {
+                    EXPECT_NEXT();
+                    EXPECT_TYPE(IDENTIFIER);
+                    arraybuilder_push(String)(&pb, CURRENT.content);
+                    EXPECT_NEXT();
+                }
+                Namespace path = (Namespace) {
+                    .length = b.length,
+                    .elements = (String*) arraybuilder_finish(String)(
+                        &pb, p->arena
+                    )
+                };
+                ArrayBuilder(String) anb = arraybuilder_new(String)();
+                ArrayBuilder(Node) atb = arraybuilder_new(Node)();
+                while(CURRENT.type == IDENTIFIER) {
+                    arraybuilder_push(String)(&anb, CURRENT.content);
+                    EXPECT_NEXT();
+                    Node arg_type = PARSE_TYPE();
+                    arraybuilder_push(Node)(&atb, arg_type);
+                }
+                Node return_type;
+                if(CURRENT.type == ARROW) {
+                    EXPECT_NEXT();
+                    return_type = PARSE_TYPE();
+                } else {
+                    String* name = (String*) arena_alloc(
+                        p->arena, sizeof(String)
+                    );
+                    *name = string_wrap_nt("unit");
+                    return_type = CREATE_NODE(
+                        NAMESPACE_ACCESS_NODE,
+                        namespace_access,
+                        .path = (Namespace) {
+                            .length = 1, .elements = name
+                        },
+                        .template_argc = 0
+                    );
+                }
+                EXPECT_TYPE(EQUALS);
+                EXPECT_NEXT();
+                EXPECT_TYPE(IDENTIFIER);
+                String external_name = CURRENT.content;
+                TRY_NEXT();
+                return CREATE_NODE(EXTERNAL_FUNCTION_NODE, external_function,
+                    .is_public = is_public, .path = path,
+                    .argc = anb.length,
+                    .argnamev = (String*) arraybuilder_finish(String)(
+                        &anb, p->arena
+                    ),
+                    .argtypev = (Node*) arraybuilder_finish(Node)(
+                        &atb, p->arena
+                    ),
+                    .return_type = ALLOC_NODE(return_type),
+                    .external_name = external_name
+                );
             } else if(CURRENT.type == KEYWORD_FUN) {
-                panic("TODO!");
+                EXPECT_NEXT();
+                EXPECT_TYPE(IDENTIFIER);
+                ArrayBuilder(String) pb = arraybuilder_new(String)();
+                arraybuilder_push(String)(&pb, CURRENT.content);
+                EXPECT_NEXT();
+                while(CURRENT.type == DOUBLE_COLON) {
+                    EXPECT_NEXT();
+                    EXPECT_TYPE(IDENTIFIER);
+                    arraybuilder_push(String)(&pb, CURRENT.content);
+                    EXPECT_NEXT();
+                }
+                Namespace path = (Namespace) {
+                    .length = b.length,
+                    .elements = (String*) arraybuilder_finish(String)(
+                        &pb, p->arena
+                    )
+                };
+                size_t template_argc = 0;
+                String* template_argnamev;
+                if(CURRENT.type == BRACKET_OPEN) {
+                    EXPECT_NEXT();
+                    ArrayBuilder(String) anb = arraybuilder_new(String)();
+                    while(CURRENT.type != BRACKET_CLOSE) {
+                        EXPECT_TYPE(IDENTIFIER);
+                        arraybuilder_push(String)(&anb, CURRENT.content);
+                        EXPECT_NEXT();
+                    }
+                    EXPECT_NEXT();
+                    template_argc = anb.length;
+                    template_argnamev = (String*) arraybuilder_finish(String)(
+                        &anb, p->arena
+                    );
+                }
+                ArrayBuilder(String) anb = arraybuilder_new(String)();
+                ArrayBuilder(Node) atb = arraybuilder_new(Node)();
+                while(!AT_END && CURRENT.type == IDENTIFIER) {
+                    arraybuilder_push(String)(&anb, CURRENT.content);
+                    EXPECT_NEXT();
+                    Node arg_type = PARSE_TYPE();
+                    arraybuilder_push(Node)(&atb, arg_type);
+                }
+                Node return_type;
+                if(CURRENT.type == ARROW) {
+                    EXPECT_NEXT();
+                    return_type = PARSE_TYPE();
+                } else {
+                    String* name = (String*) arena_alloc(
+                        p->arena, sizeof(String)
+                    );
+                    *name = string_wrap_nt("unit");
+                    return_type = CREATE_NODE(
+                        NAMESPACE_ACCESS_NODE,
+                        namespace_access,
+                        .path = (Namespace) {
+                            .length = 1, .elements = name
+                        },
+                        .template_argc = 0
+                    );
+                }
+                EXPECT_TYPE(BRACE_OPEN);
+                EXPECT_NEXT();
+                Block body = PARSE_BLOCK();
+                EXPECT_TYPE(BRACE_CLOSE);
+                TRY_NEXT();
+                return CREATE_NODE(FUNCTION_NODE, function,
+                    .is_public = is_public, .path = path,
+                    .template_argc = template_argc,
+                    .template_argnamev = template_argnamev,
+                    .argc = anb.length,
+                    .argnamev = (String*) arraybuilder_finish(String)(
+                        &anb, p->arena
+                    ),
+                    .argtypev = (Node*) arraybuilder_finish(Node)(
+                        &atb, p->arena
+                    ),
+                    .return_type = ALLOC_NODE(return_type),
+                    .body = body
+                );
             } else if(CURRENT.type == KEYWORD_RECORD) {
                 EXPECT_NEXT();
                 EXPECT_TYPE(IDENTIFIER);
