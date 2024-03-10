@@ -11,6 +11,7 @@ mod some::cool::module // module declaration
 // @  => deref
 // &  => address of
 // as  => type conversion (number types and `addr`)
+// sizeof  => size of type in bytes (returns usize)
 
 // types
 // u8 u16 u32 u64 usize  => unsigned integers
@@ -24,7 +25,6 @@ mod some::cool::module // module declaration
 // 25  => integer
 // 25.0  => float
 // "hello"  => string  (= addr[u8])
-// T  => (T = any type) size of type
 
 
 //  function permissions  | calling
@@ -44,7 +44,7 @@ ext fun malloc n usize -> addr[unit] = malloc;
 ext fun free p addr[unit] = free;
 
 pub fun cool::test { // this function is in the module `some::cool::module::test`
-    var p addr[s32] = malloc s32 as addr[s32]; // a type as an expression evaluates to its size
+    var p addr[s32] = malloc (sizeof s32) as addr[s32];
     @p = 0; // deref with '@'
     free (p as addr[s32]);
 }
@@ -55,7 +55,9 @@ pub fun cool::test { // this function is in the module `some::cool::module::test
 //  default (same module) | yes      | yes
 //  public                | yes      | yes
 
-pub record Cat name addr[u8] age u8;
+pub record Cat::balls 
+    name addr[u8] 
+    age u8;
 
 ext fun puts t addr[c::char] -> c::int = puts;
 
@@ -64,8 +66,8 @@ fun cat_example {
     puts (my_cat.name as addr[c::char]);
 }
 
-template[T] // templates can be used for functions and records
-fun sub a T b T -> T {
+// templates can be used for functions and records
+fun sub[T] a T b T -> T {
     return a - b;
 }
 
@@ -75,10 +77,9 @@ fun template_example {
     var z s32 = sub[s32] x y;
 }
 
-template[T]
-pub record Box val T;
+pub record Box[T] val T;
 
 fun another_example {
-    var b Box[Cat] = Box (Cat "Snowball" 6);
+    var b Box[Cat] = Box[Cat] (Cat "Snowball" 6);
     puts (b.val.name as addr[c::char]);
 }

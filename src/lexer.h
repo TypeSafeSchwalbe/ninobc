@@ -56,7 +56,8 @@ typedef enum {
     KEYWORD_ELSE,
     KEYWORD_WHILE,
     KEYWORD_VAR,
-    KEYWORD_UNIT
+    KEYWORD_UNIT,
+    KEYWORD_SIZEOF
 } TokenType;
 
 typedef struct {

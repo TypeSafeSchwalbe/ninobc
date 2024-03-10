@@ -10,7 +10,7 @@ typedef struct {
 
 
 typedef enum NodeType {
-    NOOP_NODE,
+    UNIT_LITERAL_NODE,
     INTEGER_LITERAL_NODE,
     FLOAT_LITERAL_NODE,
     STRING_LITERAL_NODE,
@@ -40,6 +40,7 @@ typedef enum NodeType {
     GREATER_THAN_EQUAL_NODE,
     DEREF_NODE,
     ADDRESS_OF_NODE,
+    SIZE_OF_NODE,
     MEMBER_ACCESS_NODE,
     NAMESPACE_ACCESS_NODE,
     MODULE_NODE,
@@ -51,7 +52,8 @@ typedef enum NodeType {
     RECORD_NODE,
     IF_ELSE_NODE,
     WHILE_DO_NODE,
-    UNIT_NODE
+    UNIT_NODE,
+    CALL_NODE,
 } NodeType;
 
 typedef struct Node Node;
@@ -93,6 +95,7 @@ typedef struct Node {
         struct { Node* a; Node* b; } greater_than_equal;
         struct { Node* x; } deref;
         struct { Node* x; } address_of;
+        struct { Node* t; } size_of;
         struct { Node* x; String name; } member_access;
         struct {
             Namespace path; size_t template_argc; Node* template_argv;
@@ -124,6 +127,7 @@ typedef struct Node {
         } record;
         struct { Node* condition; Block if_body; Block else_body; } if_else;
         struct { Node* condition; Block body; } while_do;
+        struct { Node* called; size_t argc; Node* argv; } call;
     } value;
 } Node;
 
@@ -131,6 +135,7 @@ typedef struct Node {
 typedef struct {
     Arena* arena;
     Token current;
+    bool at_end;
 } Parser;
 
 Parser parser_new(Arena* a);

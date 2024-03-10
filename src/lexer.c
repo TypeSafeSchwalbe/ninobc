@@ -15,7 +15,7 @@ static bool is_digit(char c) {
 static bool is_alphanumeral(char c) {
     return ('0' <= c && c <= '9')
         || ('a' <= c && c <= 'z')
-        || ('A' <= c && c <= 'A')
+        || ('A' <= c && c <= 'Z')
         || c == '_';
 }
 
@@ -82,6 +82,31 @@ bool lexer_next(Lexer* l, Token* t_out) {
         l->i = end;
         return true;
     }
+    // keywords
+    #define LEX_MULTI(s, t) { \
+            String c = string_wrap_nt(s); \
+            if(l->src.length >= l->i + c.length && string_starts_with( \
+                string_slice(l->src, l->i, l->src.length), c \
+            )) { \
+                *t_out = (Token) { .content = c, .type = t }; \
+                l->i += c.length; \
+                return true; \
+            } \
+        }
+    LEX_MULTI("mod", KEYWORD_MOD)
+    LEX_MULTI("use", KEYWORD_USE)
+    LEX_MULTI("as", KEYWORD_AS)
+    LEX_MULTI("pub", KEYWORD_PUB)
+    LEX_MULTI("fun", KEYWORD_RETURN)
+    LEX_MULTI("return", KEYWORD_RETURN)
+    LEX_MULTI("ext", KEYWORD_EXT)
+    LEX_MULTI("record", KEYWORD_RECORD)
+    LEX_MULTI("if", KEYWORD_IF)
+    LEX_MULTI("else", KEYWORD_ELSE)
+    LEX_MULTI("while", KEYWORD_WHILE)
+    LEX_MULTI("var", KEYWORD_VAR)
+    LEX_MULTI("unit", KEYWORD_UNIT)
+    LEX_MULTI("sizeof", KEYWORD_SIZEOF)
     // other complex tokens
     #define LEX_WHILE(f, t) if(f(start)) { \
             size_t end = l->i; \
@@ -101,17 +126,7 @@ bool lexer_next(Lexer* l, Token* t_out) {
     )) {
         LEX_WHILE(is_not_line_end, COMMENT)
     }
-    // multi-char tokens
-    #define LEX_MULTI(s, t) { \
-            String c = string_wrap_nt(s); \
-            if(l->src.length >= l->i + c.length && string_starts_with( \
-                string_slice(l->src, l->i, l->src.length), c \
-            )) { \
-                *t_out = (Token) { .content = c, .type = t }; \
-                l->i += c.length; \
-                return true; \
-            } \
-        }
+    // other multi-char tokens
     LEX_MULTI("->", ARROW)
     LEX_MULTI("<<", DOUBLE_LESS_THAN)
     LEX_MULTI(">>", DOUBLE_GREATER_THAN)
@@ -122,19 +137,6 @@ bool lexer_next(Lexer* l, Token* t_out) {
     LEX_MULTI("<=", LESS_THAN_EQUAL)
     LEX_MULTI(">=", GREATER_THAN_EQUAL)
     LEX_MULTI("::", DOUBLE_COLON)
-    LEX_MULTI("mod", KEYWORD_MOD)
-    LEX_MULTI("use", KEYWORD_USE)
-    LEX_MULTI("as", KEYWORD_AS)
-    LEX_MULTI("pub", KEYWORD_PUB)
-    LEX_MULTI("fun", KEYWORD_RETURN)
-    LEX_MULTI("return", KEYWORD_RETURN)
-    LEX_MULTI("ext", KEYWORD_EXT)
-    LEX_MULTI("record", KEYWORD_RECORD)
-    LEX_MULTI("if", KEYWORD_IF)
-    LEX_MULTI("else", KEYWORD_ELSE)
-    LEX_MULTI("while", KEYWORD_WHILE)
-    LEX_MULTI("var", KEYWORD_VAR)
-    LEX_MULTI("unit", KEYWORD_UNIT)
     // single-char tokens
     #define LEX_SINGLE(c, t) \
         case c: \
@@ -148,7 +150,7 @@ bool lexer_next(Lexer* l, Token* t_out) {
         LEX_SINGLE('{', BRACE_OPEN)
         LEX_SINGLE('}', BRACE_CLOSE)
         LEX_SINGLE('[', BRACKET_OPEN)
-        LEX_SINGLE(']', BRACE_CLOSE)
+        LEX_SINGLE(']', BRACKET_CLOSE)
         LEX_SINGLE('(', PAREN_OPEN)
         LEX_SINGLE(')', PAREN_CLOSE)
         LEX_SINGLE('=', EQUALS)

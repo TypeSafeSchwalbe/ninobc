@@ -20,8 +20,12 @@ Arena arena_new() {
 
 void* arena_alloc(Arena* a, size_t n) {
     size_t new_offset = a->current_offset + n;
-    while(new_offset > a->buffer_size) {
-        a->buffer_size *= 2;
+    size_t new_buffer_size = a->buffer_size;
+    while(new_offset > new_buffer_size) {
+        new_buffer_size *= 2;
+    }
+    if(new_buffer_size > a->buffer_size) {
+        a->buffer_size = new_buffer_size;
         a->buffer = (char*) realloc(a->buffer, a->buffer_size);
     }
     char* p = a->buffer + a->current_offset;
@@ -31,7 +35,6 @@ void* arena_alloc(Arena* a, size_t n) {
 
 void arena_free(Arena* a) {
     free(a->buffer);
-    free(a);
 }
 
 
