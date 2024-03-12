@@ -8,7 +8,8 @@ simply run the `build.sh`-script at the repository root.
 
 Usage:
 ```
-ninobc <main-function> <files>
+ninobc <args> <files>
 ```
-where `<files>` is any number of paths of `.nino` source files
-and `<main-function>` is the full path of a function without any arguments.
+where `<files>` is any number of input file paths and `<args>` may be:
+- `-m <main>` - specifies the full path of the main function
+- `-o <path>` - specifies the output file name 

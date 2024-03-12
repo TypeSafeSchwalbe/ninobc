@@ -1,0 +1,11 @@
+
+mod example::animals
+
+record Cat
+    name addr[u8]
+    age usize
+    hunger f32
+
+fun Cat::eat self addr[Cat] {
+    (@self).hunger = 0.0;
+}

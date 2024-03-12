@@ -8,13 +8,16 @@
 void panic(const char* reason);
 
 
-typedef struct {
+typedef struct Arena Arena;
+
+typedef struct Arena {
     char* buffer;
-    size_t current_offset;
     size_t buffer_size;
+    size_t current_offset;
+    Arena* next_buffer;
 } Arena;
 
-Arena arena_new();
+Arena arena_new(size_t buffer_size);
 void* arena_alloc(Arena* a, size_t n);
 void arena_free(Arena* a);
 
@@ -49,7 +52,7 @@ bool string_starts_with(String src, String prefix);
         size_t buffer_size; \
     } ArrayBuilder(t); \
     \
-    ArrayBuilder(t) arraybuilder_new(t)() { \
+    static ArrayBuilder(t) arraybuilder_new(t)() { \
         ArrayBuilder(t) builder; \
         builder.buffer_size = 16; \
         builder.length = 0; \
@@ -57,7 +60,7 @@ bool string_starts_with(String src, String prefix);
         return builder; \
     } \
     \
-    void arraybuilder_append(t)(ArrayBuilder(t)* b, size_t valuec, t* valuev) { \
+    static void arraybuilder_append(t)(ArrayBuilder(t)* b, size_t valuec, t* valuev) { \
         size_t new_length = b->length + valuec; \
         size_t new_buffer_size = b->buffer_size; \
         while(new_length > new_buffer_size) { \
@@ -71,11 +74,11 @@ bool string_starts_with(String src, String prefix);
         b->length = new_length; \
     } \
     \
-    void arraybuilder_push(t)(ArrayBuilder(t)* b, t value) { \
+    static void arraybuilder_push(t)(ArrayBuilder(t)* b, t value) { \
         arraybuilder_append(t)(b, 1, &value); \
     } \
     \
-    void* arraybuilder_finish(t)(ArrayBuilder(t)* b, Arena* a) { \
+    static void* arraybuilder_finish(t)(ArrayBuilder(t)* b, Arena* a) { \
         void* p = arena_alloc(a, sizeof(t) * b->length); \
         memcpy(p, b->buffer, sizeof(t) * b->length); \
         free(b->buffer); \

@@ -380,8 +380,6 @@ static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence) {
     }
 }
 
-// use cock::(and balls::*)
-
 static Namespace* parse_usages(Parser* p, Lexer* l, size_t* pathc) {
     switch(CURRENT.type) {
         case PAREN_OPEN:
@@ -635,7 +633,7 @@ static Node parse_statement(Parser* p, Lexer* l) {
                     EXPECT_NEXT();
                 }
                 Namespace path = (Namespace) {
-                    .length = b.length,
+                    .length = pb.length,
                     .elements = (String*) arraybuilder_finish(String)(
                         &pb, p->arena
                     )
