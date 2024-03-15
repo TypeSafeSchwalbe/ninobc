@@ -97,6 +97,12 @@ static Node parse_type(Parser* p, Lexer* l) {
             return PARSE_TYPE();
         case IDENTIFIER:
             return parse_identifier(p, l, true);
+        case AMPERSAND:
+            EXPECT_NEXT();
+            Node pointed_to = PARSE_TYPE();
+            return CREATE_NODE(POINTER_TYPE_NODE, pointer_type,
+                .to = ALLOC_NODE(pointed_to)
+            );
     }
     PARSING_ERROR();
 }
@@ -172,7 +178,7 @@ static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence) {
         // parse infix operators
         #define EXPECT_HAS_PREVIOUS() if(!has_previous) PARSING_ERROR();
         #define PARSE_INFIX_OPERATOR(tt, pr, nt, nv) case tt: \
-                EXPECT_HAS_PREVIOUS(); \
+                if(!has_previous) { break; } \
                 Node nv##_a = previous; \
                 EXPECT_NEXT(); \
                 Node nv##_b = PARSE_EXPRESSION_WITH(pr); \
@@ -610,6 +616,7 @@ static Node parse_statement(Parser* p, Lexer* l) {
                     .is_public = is_public, .path = path,
                     .template_argc = template_argc,
                     .template_argnamev = template_argnamev,
+                    .template_argv = NULL,
                     .argc = anb.length,
                     .argnamev = (String*) arraybuilder_finish(String)(
                         &anb, p->arena
@@ -666,6 +673,7 @@ static Node parse_statement(Parser* p, Lexer* l) {
                     .is_public = is_public, .path = path,
                     .template_argc = template_argc,
                     .template_argnamev = template_argnamev,
+                    .template_argv = NULL,
                     .argc = anb.length,
                     .argnamev = (String*) arraybuilder_finish(String)(
                         &anb, p->arena

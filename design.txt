@@ -18,7 +18,7 @@ mod some::cool::module // module declaration
 // s8 s16 s32 s64 ssize  => signed integers
 // f32 f64  => floats
 // unit  => unit type
-// addr[T]  => address of some type T
+// &T  => address of some type T
 
 // literals
 // unit  => unit value

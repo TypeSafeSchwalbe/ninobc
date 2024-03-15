@@ -32,6 +32,7 @@ String string_wrap_nt_slice(const char* data, size_t length);
 char string_char_at(String src, size_t offset);
 String string_slice(String src, size_t offset, size_t end);
 bool string_starts_with(String src, String prefix);
+bool string_eq(String a, String b);
 
 #define STRING_AS_NT(src, var_name) \
     char var_name[(src).length + 1]; \
@@ -44,6 +45,7 @@ bool string_starts_with(String src, String prefix);
 #define arraybuilder_append(t) arraybuilder_append_##t
 #define arraybuilder_push(t) arraybuilder_push_##t
 #define arraybuilder_finish(t) arraybuilder_finish_##t
+#define arraybuilder_discard(t) arraybuilder_discard_##t
 #define DEF_ARRAY_BUILDER(t) \
     \
     typedef struct { \
@@ -83,4 +85,22 @@ bool string_starts_with(String src, String prefix);
         memcpy(p, b->buffer, sizeof(t) * b->length); \
         free(b->buffer); \
         return p; \
+    } \
+    \
+    static void arraybuilder_discard(t)(ArrayBuilder(t)* b) { \
+        free(b->buffer); \
     }
+
+
+typedef struct {
+    size_t length;
+    char* buffer;
+    size_t buffer_size;
+} StringBuilder;
+
+StringBuilder stringbuilder_new();
+void stringbuilder_push(StringBuilder* b, size_t c, const char* d);
+void stringbuilder_push_nt_string(StringBuilder* b, const char* s);
+void stringbuilder_push_string(StringBuilder* b, String s);
+void stringbuilder_push_char(StringBuilder* b, char c);
+void stringbuilder_free(StringBuilder* b);

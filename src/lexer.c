@@ -8,18 +8,18 @@ Lexer lexer_new(String src) {
     };
 }
 
-static bool is_digit(char c) {
+bool is_digit(char c) {
     return '0' <= c && c <= '9';
 }
 
-static bool is_alphanumeral(char c) {
+bool is_alphanumeral(char c) {
     return ('0' <= c && c <= '9')
         || ('a' <= c && c <= 'z')
         || ('A' <= c && c <= 'Z')
         || c == '_';
 }
 
-static bool is_whitespace(char c) {
+bool is_whitespace(char c) {
     switch(c) {
         case 9: // horizontal tab
         case 10: // line feed
@@ -30,7 +30,7 @@ static bool is_whitespace(char c) {
     return false;
 }
 
-static bool is_not_line_end(char c) {
+bool is_not_line_end(char c) {
     switch(c) {
         case 10: // line feed
         case 13: // carriage feed

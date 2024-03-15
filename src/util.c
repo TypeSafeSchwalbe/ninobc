@@ -76,4 +76,46 @@ bool string_starts_with(String src, String prefix) {
     return memcmp(src.data, prefix.data, prefix.length) == 0;
 }
 
+bool string_eq(String a, String b) {
+    if(a.length != b.length) { return false; }
+    return memcmp(a.data, b.data, a.length) == 0;
+}
 
+
+StringBuilder stringbuilder_new() {
+    StringBuilder sb;
+    sb.buffer_size = 1024;
+    sb.buffer = (char*) malloc(sizeof(char) * sb.buffer_size);
+    sb.length = 0;
+    return sb;
+}
+
+void stringbuilder_push(StringBuilder* b, size_t c, const char* d) {
+    size_t new_length = b->length + c;
+    size_t new_buffer_size = b->buffer_size;
+    while(new_length > new_buffer_size) {
+        new_buffer_size *= 2;
+    }
+    if(new_buffer_size > b->buffer_size) {
+        b->buffer_size = new_buffer_size;
+        b->buffer = (char*) realloc(b->buffer, sizeof(char) * b->buffer_size);
+    }
+    memcpy(b->buffer + b->length, d, c);
+    b->length = new_length;
+}
+
+void stringbuilder_push_nt_string(StringBuilder* b, const char* s) {
+    stringbuilder_push(b, strlen(s), s);
+}
+
+void stringbuilder_push_string(StringBuilder* b, String s) {
+    stringbuilder_push(b, s.length, s.data);
+}
+
+void stringbuilder_push_char(StringBuilder* b, char c) {
+    stringbuilder_push(b, 1, &c);
+}
+
+void stringbuilder_free(StringBuilder* b) {
+    free(b->buffer);
+}

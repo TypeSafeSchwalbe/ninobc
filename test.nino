@@ -1,11 +1,11 @@
 
-mod example::animals
+mod example
 
 record Cat
-    name addr[u8]
-    age usize
     hunger f32
 
-fun Cat::eat self addr[Cat] {
-    (@self).hunger = 0.0;
+fun main {
+    var x u64 = 0;
+    var my_cat example::Cat = @(&x as &example::Cat);
+    my_cat.hunger = 0.5;
 }

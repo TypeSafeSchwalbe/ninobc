@@ -52,8 +52,8 @@ typedef enum NodeType {
     RECORD_NODE,
     IF_ELSE_NODE,
     WHILE_DO_NODE,
-    UNIT_NODE,
     CALL_NODE,
+    POINTER_TYPE_NODE
 } NodeType;
 
 typedef struct Node Node;
@@ -99,6 +99,7 @@ typedef struct Node {
         struct { Node* x; String name; } member_access;
         struct {
             Namespace path; size_t template_argc; Node* template_argv;
+            size_t variant;
         } namespace_access;
         struct { Namespace path; } module;
         struct { size_t pathc; Namespace* pathv; } use;
@@ -107,6 +108,7 @@ typedef struct Node {
             bool is_public;
             Namespace path;
             size_t template_argc; String* template_argnamev;
+            Node* template_argv;
             size_t argc; String* argnamev; Node* argtypev;
             Node* return_type;
             Block body;
@@ -123,11 +125,13 @@ typedef struct Node {
             bool is_public;
             Namespace path;
             size_t template_argc; String* template_argnamev;
+            Node* template_argv;
             size_t argc; String* argnamev; Node* argtypev;
         } record;
         struct { Node* condition; Block if_body; Block else_body; } if_else;
         struct { Node* condition; Block body; } while_do;
         struct { Node* called; size_t argc; Node* argv; } call;
+        struct { Node* to; } pointer_type;
     } value;
 } Node;
 

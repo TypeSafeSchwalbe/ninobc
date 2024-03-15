@@ -71,5 +71,9 @@ typedef struct {
 } Lexer;
 
 Lexer lexer_new(String src);
+bool is_digit(char c);
+bool is_alphanumeral(char c);
+bool is_whitespace(char c);
+bool is_not_line_end(char c);
 bool lexer_next(Lexer* l, Token* t_out);
 bool lexer_next_filtered(Lexer* l, Token* t_out);
