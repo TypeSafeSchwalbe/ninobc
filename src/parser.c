@@ -309,6 +309,13 @@ static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence) {
                     .value = string_value
                 );
                 break;
+            case BOOLEAN:
+                String boolean_value = CURRENT.content;
+                TRY_NEXT();
+                node = CREATE_NODE(BOOLEAN_LITERAL_NODE, boolean_literal,
+                    .value = boolean_value
+                );
+                break;
             case IDENTIFIER:
                 node = parse_identifier(p, l, false);
                 break;
@@ -502,7 +509,7 @@ static Node parse_statement(Parser* p, Lexer* l) {
                     EXPECT_NEXT();
                 }
                 Namespace path = (Namespace) {
-                    .length = b.length,
+                    .length = pb.length,
                     .elements = (String*) arraybuilder_finish(String)(
                         &pb, p->arena
                     )
@@ -563,7 +570,7 @@ static Node parse_statement(Parser* p, Lexer* l) {
                     EXPECT_NEXT();
                 }
                 Namespace path = (Namespace) {
-                    .length = b.length,
+                    .length = pb.length,
                     .elements = (String*) arraybuilder_finish(String)(
                         &pb, p->arena
                     )

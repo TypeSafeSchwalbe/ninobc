@@ -14,6 +14,7 @@ typedef enum NodeType {
     INTEGER_LITERAL_NODE,
     FLOAT_LITERAL_NODE,
     STRING_LITERAL_NODE,
+    BOOLEAN_LITERAL_NODE,
     VARIABLE_NODE,
     VARIABLE_DECLARATION_NODE,
     ASSIGNMENT_NODE,
@@ -69,6 +70,7 @@ typedef struct Node {
         struct { String value; } integer_literal;
         struct { String value; } float_literal;
         struct { String value; } string_literal;
+        struct { String value; } boolean_literal; 
         struct { String name; } variable;
         struct { String name; Node* type; Node* value; } variable_declaration;
         struct { Node* to; Node* value; } assignment;

@@ -102,6 +102,7 @@ static Node monomorphize_node(
         case INTEGER_LITERAL_NODE:
         case FLOAT_LITERAL_NODE:
         case STRING_LITERAL_NODE:
+        case BOOLEAN_LITERAL_NODE:
         case VARIABLE_NODE:
         case MODULE_NODE:
         case USE_NODE:
@@ -477,7 +478,7 @@ void collect_symbols(Block ast, SymbolTable* table, Arena* arena) {
                 arraybuilder_append(String)(
                     &pb, module.length, module.elements
                 );
-                Namespace *spath;
+                Namespace* spath;
                 switch(n.type) {
                     case RECORD_NODE: 
                         spath = &n.value.record.path;

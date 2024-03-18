@@ -12,6 +12,7 @@ typedef enum {
     INTEGER,
     FLOAT,
     STRING,
+    BOOLEAN,
     BRACE_OPEN,
     BRACE_CLOSE,
     BRACKET_OPEN,

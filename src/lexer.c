@@ -110,6 +110,8 @@ bool lexer_next(Lexer* l, Token* t_out) {
     LEX_KEYWORD("var", KEYWORD_VAR)
     LEX_KEYWORD("unit", KEYWORD_UNIT)
     LEX_KEYWORD("sizeof", KEYWORD_SIZEOF)
+    LEX_KEYWORD("true", BOOLEAN)
+    LEX_KEYWORD("false", BOOLEAN)
     // other complex tokens
     #define LEX_WHILE(f, t) if(f(start)) { \
             size_t end = l->i; \
