@@ -21,12 +21,18 @@ void s_table_free(SymbolTable* table);
 typedef struct Symbol {
     Namespace path;
     Node node;
+    Namespace defined_in;
+    size_t used_path_count;
+    Namespace* used_paths;
     size_t variant_count;
     Node* variants;
     size_t variants_bsize;
 } Symbol;
 
-Symbol symbol_new(Namespace path, Node node);
+Symbol symbol_new(
+    Namespace path, Node node, Namespace definined_in, size_t used_path_count,
+    Namespace* used_paths
+);
 size_t symbol_targc(Symbol* s);
 size_t symbol_find_variant(
     Symbol* s, size_t argc, Node* argv, SymbolTable* symbols, Arena* arena

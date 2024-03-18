@@ -432,7 +432,7 @@ static Namespace* parse_usages(Parser* p, Lexer* l, size_t* pathc) {
             for(size_t fpathi = 0; fpathi < fpathc; fpathi += 1) {
                 Namespace old_path = fpathv[fpathi];
                 String* new_elements = (String*) arena_alloc(
-                    p->arena, sizeof(String) * old_path.length + 1
+                    p->arena, sizeof(String) * (old_path.length + 1)
                 );
                 new_elements[0] = name;
                 memcpy(

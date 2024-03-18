@@ -1,0 +1,8 @@
+
+mod std::io
+
+ext fun libc::puts s &u8 -> s32 = puts
+
+pub fun println line &u8 {
+    libc::puts line;
+}

@@ -57,18 +57,20 @@ static void targs_free(TemplateArgs* targs) {
 
 
 static Node monomorphize_node(
-    Node* n, SymbolTable* symbols, Arena* arena, TemplateArgs* targs
+    Node* n, Symbol* symbol, SymbolTable* symbols, Arena* arena, 
+    TemplateArgs* targs
 );
 
 DEF_ARRAY_BUILDER(Node);
 
 static Block monomorphize_block(
-    Block b, SymbolTable* symbols, Arena* arena, TemplateArgs* targs
+    Block b, Symbol* symbol, SymbolTable* symbols, Arena* arena,
+    TemplateArgs* targs
 ) {
     ArrayBuilder(Node) sb = arraybuilder_new(Node)();
     for(size_t si = 0; si < b.length; si += 1) {
         arraybuilder_push(Node)(&sb, monomorphize_node(
-            b.statements + si, symbols, arena, targs
+            b.statements + si, symbol, symbols, arena, targs
         ));
     }
     return (Block) {
@@ -77,23 +79,107 @@ static Block monomorphize_block(
     };
 }
 
+#include <stdio.h>
+
+static bool expand_path(
+    Namespace accessed_path, Symbol* symbol, SymbolTable* symbols, Arena* arena,
+    Namespace* expanded
+) {
+    for(size_t symboli = 0; symboli < symbols->count; symboli += 1) {
+        Symbol* csymbol = symbols->symbols + symboli;
+        if(csymbol->path.length != symbol->defined_in.length
+            + accessed_path.length) { continue; }
+        bool matches = true;
+        for(size_t ei = 0; ei < symbol->defined_in.length; ei += 1) {
+            if(string_eq(
+                csymbol->path.elements[ei],
+                symbol->defined_in.elements[ei]
+            )) { continue; }
+            matches = false;
+            break;
+        }
+        if(!matches) { continue; }
+        for(size_t ei = 0; ei < accessed_path.length; ei += 1) {
+            if(string_eq(
+                csymbol->path.elements[symbol->defined_in.length + ei],
+                accessed_path.elements[ei]
+            )) { continue; }
+            matches = false;
+            break;
+        }
+        if(!matches) { continue; }
+        *expanded = csymbol->path;
+        return true;
+    }
+    signed long long int usagei;
+    for(usagei = symbol->used_path_count - 1; usagei >= 0; usagei -= 1) {
+        Namespace used_path = symbol->used_paths[usagei];
+        String last_part = used_path.elements[used_path.length - 1];
+        if(string_eq(last_part, string_wrap_nt("*"))) {
+            for(size_t symboli = 0; symboli < symbols->count; symboli += 1) {
+                Namespace cpath = symbols->symbols[symboli].path;
+                if(cpath.length < used_path.length + accessed_path.length - 1) {
+                    continue;
+                }
+                bool matches = true;
+                for(size_t ei = 0; ei < used_path.length - 1; ei += 1) {
+                    if(string_eq(
+                        cpath.elements[ei],
+                        used_path.elements[ei]
+                    )) { continue; }
+                    matches = false;
+                    break;
+                }
+                if(!matches) { continue; }
+                for(size_t ei = 0; ei < accessed_path.length; ei += 1) {
+                    if(string_eq(
+                        cpath.elements[used_path.length - 1 + ei],
+                        accessed_path.elements[ei]
+                    )) { continue; }
+                    matches = false;
+                    break;
+                }
+                if(!matches) { continue; }
+                *expanded = cpath;
+                return true;
+            }
+        }
+        if(!string_eq(last_part, accessed_path.elements[0])) { continue; }
+        expanded->length = used_path.length + accessed_path.length - 1;
+        expanded->elements = (String*) arena_alloc(
+            arena, expanded->length * sizeof(String)
+        );
+        memcpy(
+            expanded->elements, used_path.elements,
+            used_path.length * sizeof(String)
+        );
+        memcpy(
+            expanded->elements + used_path.length, accessed_path.elements + 1,
+            (accessed_path.length - 1) * sizeof(String)
+        );
+        return true;
+    }
+    return false;
+}
+
 static Node monomorphize_node(
-    Node* n, SymbolTable* symbols, Arena* arena, TemplateArgs* targs
+    Node* n, Symbol* symbol, SymbolTable* symbols, Arena* arena, 
+    TemplateArgs* targs
 ) {
     #define MONOMORPHIZE_MONOOP(tn, vn, x, ...) case tn: \
         return (Node) { .type = tn, .value = { .vn = { \
             .x = ALLOC_NODE(monomorphize_node( \
-                n->value.vn.x, symbols, arena, targs \
+                n->value.vn.x, symbol, symbols, arena, targs \
             )), \
             __VA_ARGS__ \
         } } };
     #define MONOMORPHIZE_BIOP(tn, vn, a, b, ...) case tn: \
         return (Node) { .type = tn, .value = { .vn = { \
             .a = ALLOC_NODE(monomorphize_node( \
-                n->value.vn.a, symbols, arena, targs \
+                n->value.vn.a, symbol, symbols, arena, targs \
             )), \
             .b = ALLOC_NODE(monomorphize_node( \
-                n->value.vn.b, symbols, arena, targs \
+                n->value.vn.b, symbol, symbols, arena, targs \
             )), \
             __VA_ARGS__ \
         } } };
@@ -103,7 +189,6 @@ static Node monomorphize_node(
         case FLOAT_LITERAL_NODE:
         case STRING_LITERAL_NODE:
         case BOOLEAN_LITERAL_NODE:
-        case VARIABLE_NODE:
         case MODULE_NODE:
         case USE_NODE:
         case EXTERNAL_FUNCTION_NODE:
@@ -148,18 +233,37 @@ static Node monomorphize_node(
         MONOMORPHIZE_MONOOP(
             IF_ELSE_NODE, if_else, condition,
             .if_body = monomorphize_block(
-                n->value.if_else.if_body, symbols, arena, targs
+                n->value.if_else.if_body, symbol, symbols, arena, targs
             ),
             .else_body = monomorphize_block(
-                n->value.if_else.else_body, symbols, arena, targs
+                n->value.if_else.else_body, symbol, symbols, arena, targs
             )
         )
         MONOMORPHIZE_MONOOP(
             WHILE_DO_NODE, while_do, condition,
             .body = monomorphize_block(
-                n->value.while_do.body, symbols, arena, targs
+                n->value.while_do.body, symbol, symbols, arena, targs
             )
         )
+        case VARIABLE_NODE: {
+            Namespace var_as_path = (Namespace) {
+                .elements = &n->value.variable.name,
+                .length = 1
+            };
+            Namespace expanded_var_path;
+            if(!expand_path(
+                var_as_path, symbol, symbols, arena, &expanded_var_path
+            )) { return *n; }
+            return (Node) {
+                .type = NAMESPACE_ACCESS_NODE,
+                .value = { .namespace_access = {
+                    .path = expanded_var_path,
+                    .variant = 0,
+                    .template_argc = 0,
+                    .template_argv = NULL
+                } }
+            };
+        }
         case FUNCTION_NODE: {
             size_t targc = n->value.function.template_argc;
             Node* targv = (Node*) arena_alloc(arena, sizeof(Node) * targc);
@@ -174,7 +278,8 @@ static Node monomorphize_node(
             Node* argtypev = (Node*) arena_alloc(arena, sizeof(Node) * argc);
             for(size_t argi = 0; argi < argc; argi += 1) {
                 argtypev[argi] = monomorphize_node(
-                    n->value.function.argtypev + argi, symbols, arena, targs
+                    n->value.function.argtypev + argi, symbol, symbols, arena,
+                    targs
                 );
             }
             return (Node) {
@@ -189,10 +294,11 @@ static Node monomorphize_node(
                     .argnamev = n->value.function.argnamev,
                     .argtypev = argtypev,
                     .return_type = ALLOC_NODE(monomorphize_node(
-                        n->value.function.return_type, symbols, arena, targs
+                        n->value.function.return_type, symbol, symbols, arena,
+                        targs
                     )),
                     .body = monomorphize_block(
-                        n->value.function.body, symbols, arena, targs
+                        n->value.function.body, symbol, symbols, arena, targs
                     )
                 } }
             };
@@ -211,7 +317,8 @@ static Node monomorphize_node(
             Node* argtypev = (Node*) arena_alloc(arena, sizeof(Node) * argc);
             for(size_t argi = 0; argi < argc; argi += 1) {
                 argtypev[argi] = monomorphize_node(
-                    n->value.record.argtypev + argi, symbols, arena, targs
+                    n->value.record.argtypev + argi, symbol, symbols, arena,
+                    targs
                 );
             }
             return (Node) {
@@ -235,14 +342,14 @@ static Node monomorphize_node(
             );
             for(size_t argi = 0; argi < call_argc; argi += 1) {
                 call_argv[argi] = monomorphize_node(
-                    n->value.call.argv + argi, symbols, arena, targs
+                    n->value.call.argv + argi, symbol, symbols, arena, targs
                 );
             }
             return (Node) {
                 .type = CALL_NODE,
                 .value = { .call = {
                     .called = ALLOC_NODE(monomorphize_node(
-                        n->value.call.called, symbols, arena, targs
+                        n->value.call.called, symbol, symbols, arena, targs
                     )),
                     .argc = call_argc,
                     .argv = call_argv
@@ -256,6 +363,12 @@ static Node monomorphize_node(
                     targs, accessed_path.elements[0]
                 )) { return *targ; }
             }
+            Namespace expanded_accessed_path;
+            if(expand_path(
+                accessed_path, symbol, symbols, arena, &expanded_accessed_path
+            )) {
+                accessed_path = expanded_accessed_path;
+            }
             Symbol* symbol;
             if(!(symbol = s_table_lookup(symbols, accessed_path))) {
                 return *n;
@@ -265,7 +378,7 @@ static Node monomorphize_node(
             Node targv[targc];
             for(size_t argi = 0; argi < targc; argi += 1) {
                 targv[argi] = monomorphize_node(
-                    node_targv + argi, symbols, arena, targs
+                    node_targv + argi, symbol, symbols, arena, targs
                 );
             }
             size_t variant = symbol_find_variant(
@@ -317,10 +430,16 @@ static bool template_arg_eq(Node* a, Node* b) {
 }
 
 
-Symbol symbol_new(Namespace path, Node node) {
+Symbol symbol_new(
+    Namespace path, Node node, Namespace definined_in, size_t used_path_count,
+    Namespace* used_paths
+) {
     Symbol s;
     s.path = path;
     s.node = node;
+    s.defined_in = definined_in;
+    s.used_path_count = used_path_count;
+    s.used_paths = used_paths;
     s.variants_bsize = 1;
     s.variants = (Node*) malloc(sizeof(Node) * s.variants_bsize);
     s.variant_count = 0;
@@ -394,7 +513,7 @@ size_t symbol_find_variant(
     for(size_t argi = 0; argi < argc; argi += 1) {
         targs_add(&targs, symbol_t_argnamev[argi], argv[argi]);
     }
-    Node monomorphized = monomorphize_node(&s->node, symbols, arena, &targs);
+    Node monomorphized = monomorphize_node(&s->node, s, symbols, arena, &targs);
     targs_free(&targs);
     if(s->variant_count + 1 > s->variants_bsize) {
         s->variants_bsize *= 2;
@@ -459,8 +578,22 @@ void s_table_free(SymbolTable* table) {
 
 
 DEF_ARRAY_BUILDER(String)
+DEF_ARRAY_BUILDER(Namespace)
 
 void collect_symbols(Block ast, SymbolTable* table, Arena* arena) {
+    ArrayBuilder(Namespace) ub = arraybuilder_new(Namespace)();
+    for(size_t nodei = 0; nodei < ast.length; nodei += 1) {
+        Node n = ast.statements[nodei];
+        if(n.type == USE_NODE) {
+            arraybuilder_append(Namespace)(
+                &ub, n.value.use.pathc, n.value.use.pathv
+            );
+        }
+    }
+    size_t used_path_count = ub.length;
+    Namespace* used_paths = (Namespace*) arraybuilder_finish(Namespace)(
+        &ub, arena
+    );
     Namespace module;
     bool has_module;
     for(size_t nodei = 0; nodei < ast.length; nodei += 1) {
@@ -500,7 +633,9 @@ void collect_symbols(Block ast, SymbolTable* table, Arena* arena) {
                     )
                 };
                 *spath = cpath;
-                s_table_add(table, symbol_new(cpath, n));
+                s_table_add(table, symbol_new(
+                    cpath, n, module, used_path_count, used_paths
+                ));
                 break;
         }
     }

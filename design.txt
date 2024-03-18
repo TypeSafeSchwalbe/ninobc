@@ -19,12 +19,14 @@ mod some::cool::module // module declaration
 // f32 f64  => floats
 // unit  => unit type
 // &T  => address of some type T
+// bool  => boolean
 
 // literals
 // unit  => unit value
 // 25  => integer
 // 25.0  => float
 // "hello"  => string  (= addr[u8])
+// true false  => boolean
 
 
 //  function permissions  | calling
