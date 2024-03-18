@@ -77,16 +77,6 @@ static void emit_block(Block block, SymbolTable* symbols, StringBuilder* out);
 static void emit_node(
     Node* node, SymbolTable* symbols, StringBuilder* out
 ) {
-    if(node == NULL) {
-        WRITE("/* NULL */");
-        return;
-    }
-    WRITE("/* NODE TYPE: ");
-    size_t type_str_len = snprintf(NULL, 0, "%zu", node->type);
-    char type_str[type_str_len];
-    sprintf(type_str, "%zu", node->type);
-    stringbuilder_push(out, type_str_len, type_str);
-    WRITE(" */");
     switch(node->type) {
         // case UNIT_LITERAL_NODE:
         // case MODULE_NODE:
@@ -272,13 +262,51 @@ static void emit_node(
             WRITE(" }");
             break;
         case CALL_NODE:
-            WRITE_NODE(node->value.call.called);
-            WRITE_C('(');
-            for(size_t argi = 0; argi < node->value.call.argc; argi += 1) {
-                if(argi > 0) { WRITE(", "); }
-                WRITE_NODE(node->value.call.argv + argi);
+            #define WRITE_ARGS() \
+                WRITE_C('('); \
+                for(size_t argi = 0; argi < node->value.call.argc; argi += 1) { \
+                    if(argi > 0) { WRITE(", "); } \
+                    WRITE_NODE(node->value.call.argv + argi); \
+                } \
+                WRITE_C(')');
+            if(node->value.call.called->type == NAMESPACE_ACCESS_NODE) {
+                Namespace called_path = node->value.call.called
+                    ->value.namespace_access.path;
+                size_t called_variant = node->value.call.called
+                    ->value.namespace_access.variant;
+                Symbol* called = s_table_lookup(symbols, called_path);
+                if(called == NULL) { panic("Symbol could not be found!"); }
+                switch(called->node.type) {
+                    case FUNCTION_NODE:
+                        emit_path(&called_path, called_variant, out);
+                        WRITE_ARGS();
+                        break;
+                    case EXTERNAL_FUNCTION_NODE:
+                        WRITE_S(
+                            called->node.value.external_function.external_name
+                        );
+                        WRITE_ARGS();
+                        break;
+                    case RECORD_NODE:
+                        WRITE_C('(');
+                        emit_path(&called_path, called_variant, out);
+                        WRITE(") { ");
+                        size_t memberc = called->node.value.record.argc;
+                        String* membernamev = called->node.value.record.argnamev;
+                        for(size_t argi = 0; argi < memberc; argi += 1) {
+                            if(argi > 0) { WRITE(", "); }
+                            WRITE_C('.');
+                            WRITE_S(membernamev[argi]);
+                            WRITE(" = ");
+                            WRITE_NODE(node->value.call.argv + argi);
+                        }
+                        WRITE(" }");
+                        break;
+                }
+            } else {
+                WRITE_NODE(node->value.call.called);
+                WRITE_ARGS();
             }
-            WRITE_C(')');
             break;
     }
 }
@@ -317,7 +345,7 @@ static void emit_symbol_variant_pre(
             WRITE(");\n");
             break;
         case EXTERNAL_FUNCTION_NODE:
-            WRITE("external ");
+            WRITE("extern ");
             emit_type(symbol->value.external_function.return_type, out);
             WRITE_C(' ');
             WRITE_S(symbol->value.external_function.external_name);

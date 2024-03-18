@@ -44,7 +44,7 @@ bool lexer_next(Lexer* l, Token* t_out) {
     char start = string_char_at(l->src, l->i);
     // string literal
     if(start == '"') {
-        size_t end = l->i;
+        size_t end = l->i + 1;
         bool escaped = false;
         while(end < l->src.length
             && (string_char_at(l->src, end) != '\"' || escaped)) {

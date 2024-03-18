@@ -279,16 +279,6 @@ static Node monomorphize_node(
                     .variant = variant
                 } }
             };
-            // if(symbol->node.type == FUNCTION_NODE 
-            // || symbol->node.type == EXTERNAL_FUNCTION_NODE) {
-            //     return (Node) {
-            //         .type = CALL_NODE,
-            //         .value = { .call = {
-            //             .called = ALLOC_NODE(access_node),
-            //             .argc = 0
-            //         } }
-            //     };
-            // }
             return access_node;
     }
 }

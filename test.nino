@@ -1,11 +1,15 @@
 
 mod example
 
+ext fun puts s &u8 -> s32 = puts
+
 record Cat
+    name &u8
+    age u8
     hunger f32
 
 fun main {
-    var x u64 = 0;
-    var my_cat example::Cat = @(&x as &example::Cat);
-    my_cat.hunger = 0.5;
+    var mine example::Cat = example::Cat "Cookie" 5 0.0;
+    puts (mine.name);
 }
+

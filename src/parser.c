@@ -369,7 +369,10 @@ static Node parse_expression(Parser* p, Lexer* l, uint8_t precedence) {
                 Node* new_argv = (Node*) arena_alloc(
                     p->arena, sizeof(Node) * new_argc
                 );
-                memcpy(new_argv, previous.value.call.argv, new_argc - 1);
+                memcpy(
+                    new_argv, previous.value.call.argv,
+                    (new_argc - 1) * sizeof(Node)
+                );
                 new_argv[new_argc - 1] = node;
                 previous.value.call.argc = new_argc;
                 previous.value.call.argv = new_argv;
