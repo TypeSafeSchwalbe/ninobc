@@ -219,7 +219,6 @@ static Node monomorphize_node(
         MONOMORPHIZE_MONOOP(ADDRESS_OF_NODE, deref, x)
         MONOMORPHIZE_MONOOP(SIZE_OF_NODE, size_of, t)
         MONOMORPHIZE_BIOP(TYPE_CONVERSION_NODE, type_conversion, x, to)
-        MONOMORPHIZE_MONOOP(RETURN_VALUE_NODE, return_value, x)
         MONOMORPHIZE_MONOOP(POINTER_TYPE_NODE, pointer_type, to)
         MONOMORPHIZE_BIOP(
             VARIABLE_DECLARATION_NODE, variable_declaration, 
@@ -332,6 +331,19 @@ static Node monomorphize_node(
                     .argc = argc,
                     .argnamev = n->value.record.argnamev,
                     .argtypev = argtypev
+                } }
+            };
+        }
+        case RETURN_VALUE_NODE: {
+            bool has_value = n->value.return_value.has_value;
+            return (Node) {
+                .type = RETURN_VALUE_NODE,
+                .value = { .return_value = {
+                    .has_value = has_value,
+                    .value = has_value? ALLOC_NODE(monomorphize_node(
+                        n->value.return_value.value, symbol, symbols, arena, 
+                        targs
+                    )) : NULL
                 } }
             };
         }
@@ -509,22 +521,31 @@ size_t symbol_find_variant(
     if(symbol_t_argc != argc) {
         panic("Invalid template arg count!");
     }
-    TemplateArgs targs = targs_new();
-    for(size_t argi = 0; argi < argc; argi += 1) {
-        targs_add(&targs, symbol_t_argnamev[argi], argv[argi]);
-    }
-    Node monomorphized = monomorphize_node(&s->node, s, symbols, arena, &targs);
-    targs_free(&targs);
     if(s->variant_count + 1 > s->variants_bsize) {
         s->variants_bsize *= 2;
         s->variants = (Node*) realloc(
             s->variants, sizeof(Node) * s->variants_bsize
         );
     }
-    s->variants[s->variant_count] = monomorphized;
-    size_t r_vari = s->variant_count;
+    size_t variant_idx = s->variant_count;
+    Node* variant_node = s->variants + variant_idx;
     s->variant_count += 1;
-    return r_vari;
+    *variant_node = s->node;
+    switch(variant_node->type) {
+        case FUNCTION_NODE:
+            variant_node->value.function.template_argv = argv;
+            break;
+        case RECORD_NODE:
+            variant_node->value.record.template_argv = argv;
+            break;
+    }
+    TemplateArgs targs = targs_new();
+    for(size_t argi = 0; argi < argc; argi += 1) {
+        targs_add(&targs, symbol_t_argnamev[argi], argv[argi]);
+    }
+    *variant_node = monomorphize_node(&s->node, s, symbols, arena, &targs);
+    targs_free(&targs);
+    return variant_idx;
 }
 
 Symbol* s_table_lookup(SymbolTable* table, Namespace path) {

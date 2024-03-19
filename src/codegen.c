@@ -256,8 +256,11 @@ static void emit_node(
             WRITE_NODE(node->value.type_conversion.x);
             break;
         case RETURN_VALUE_NODE:
-            WRITE("return ");
-            WRITE_NODE(node->value.return_value.x);
+            WRITE("return");
+            if(node->value.return_value.has_value) {
+                WRITE_C(' ');
+                WRITE_NODE(node->value.return_value.value);
+            }
             break;
         case IF_ELSE_NODE:
             WRITE("if(");
@@ -288,8 +291,14 @@ static void emit_node(
                     ->value.namespace_access.path;
                 size_t called_variant = node->value.call.called
                     ->value.namespace_access.variant;
+                
                 Symbol* called = s_table_lookup(symbols, called_path);
-                if(called == NULL) { panic("Symbol could not be found!"); }
+                if(called == NULL) {
+                    WRITE("/* COULD NOT BE FOUND: '");
+                    emit_path(&called_path, called_variant, out);
+                    WRITE("' */");
+                    return;
+                }
                 switch(called->node.type) {
                     case FUNCTION_NODE:
                         emit_path(&called_path, called_variant, out);

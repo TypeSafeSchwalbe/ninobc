@@ -122,7 +122,7 @@ typedef struct Node {
             Node* return_type;
             String external_name;
         } external_function;
-        struct { Node* x; } return_value;
+        struct { bool has_value; Node* value; } return_value;
         struct {
             bool is_public;
             Namespace path;

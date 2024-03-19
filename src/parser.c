@@ -695,9 +695,16 @@ static Node parse_statement(Parser* p, Lexer* l) {
             } else { PARSING_ERROR(); }
         case KEYWORD_RETURN:
             EXPECT_NEXT();
+            if(CURRENT.type == KEYWORD_UNIT) {
+                TRY_NEXT();
+                return CREATE_NODE(RETURN_VALUE_NODE, return_value,
+                    .has_value = false
+                );
+            }
             Node returned_value = PARSE_EXPRESSION();
             return CREATE_NODE(RETURN_VALUE_NODE, return_value,
-                .x = ALLOC_NODE(returned_value)
+                .has_value = true,
+                .value = ALLOC_NODE(returned_value)
             );
         case KEYWORD_IF:
             EXPECT_NEXT();
