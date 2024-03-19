@@ -224,8 +224,9 @@ static void emit_node(
             WRITE_NODE(node->value.address_of.x);
             break;
         case SIZE_OF_NODE:
-            WRITE("sizeof");
-            WRITE_NODE(node->value.size_of.t);
+            WRITE("sizeof(");
+            emit_type(node->value.size_of.t, out);
+            WRITE_C(')');
             break;
         case MEMBER_ACCESS_NODE:
             WRITE_NODE(node->value.member_access.x);
