@@ -291,7 +291,6 @@ static void emit_node(
                     ->value.namespace_access.path;
                 size_t called_variant = node->value.call.called
                     ->value.namespace_access.variant;
-                
                 Symbol* called = s_table_lookup(symbols, called_path);
                 if(called == NULL) {
                     WRITE("/* COULD NOT BE FOUND: '");
