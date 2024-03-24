@@ -6,6 +6,13 @@
 #define WRITE_S(s) stringbuilder_push_string(out, s)
 #define WRITE_C(c) stringbuilder_push_char(out, c)
 
+typedef struct RecordEntry {
+    Namespace path;
+    size_t variant;
+} RecordEntry;
+
+DEF_ARRAY_BUILDER(RecordEntry)
+
 static void emit_path_element(String* element, StringBuilder* out) {
     for(size_t i = 0; i < element->length; i += 1) {
         char c = string_char_at(*element, i);
@@ -26,7 +33,69 @@ static void emit_path(Namespace* path, size_t variant, StringBuilder* out) {
     stringbuilder_push(out, variant_str_len, variant_str);
 }
 
-static void emit_type(Node* n, StringBuilder* out) {
+#define WRITE_TYPE(t) \
+    emit_type(t, symbols, typesdefs, types, out)
+
+static void emit_type(
+    Node* n, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
+);
+
+static bool namespace_eq(Namespace a, Namespace b) {
+    if(a.length != b.length) { return false; }
+    for(size_t elementi = 0; elementi < a.length; elementi += 1) {
+        if(!string_eq(a.elements[elementi], b.elements[elementi])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void declare_type(
+    Namespace path, size_t variant, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types
+) {
+    for(size_t typei = 0; typei < types->length; typei += 1) {
+        RecordEntry* entry = ((RecordEntry*) types->buffer) + typei;
+        if(namespace_eq(path, entry->path) && variant == entry->variant) {
+            return;
+        }
+    }
+    StringBuilder decl = stringbuilder_new();
+    StringBuilder* out = &decl;
+    Symbol* s = s_table_lookup(symbols, path);
+    if(s == NULL) { return; }
+    if(variant >= s->variant_count) { return; }
+    Node* symbol = s->variants + variant;
+    arraybuilder_push(RecordEntry)(types, (RecordEntry) {
+        .path = path, .variant = variant
+    });
+    switch(symbol->type) {
+        case RECORD_NODE:
+            WRITE("typedef struct ");
+            emit_path(&symbol->value.record.path, variant, out);
+            WRITE(" { ");
+            for(size_t argi = 0; argi < symbol->value.record.argc; argi += 1) {
+                WRITE_TYPE(symbol->value.record.argtypev + argi);
+                WRITE_C(' ');
+                WRITE_S(symbol->value.record.argnamev[argi]);
+                WRITE("; ");
+            }
+            WRITE("} ");
+            emit_path(&symbol->value.record.path, variant, out);
+            WRITE(";\n");
+            break;
+    }
+    stringbuilder_push(typesdefs, decl.length, decl.buffer);
+    stringbuilder_free(&decl);
+}
+
+static void emit_type(
+    Node* n, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
+) {
     switch(n->type) {
         case NAMESPACE_ACCESS_NODE:
             if(n->value.namespace_access.path.length == 1) {
@@ -52,6 +121,11 @@ static void emit_type(Node* n, StringBuilder* out) {
                 EMIT_CORE_TYPE("unit", "void");
                 EMIT_CORE_TYPE("bool", "bool");
             }
+            declare_type(
+                n->value.namespace_access.path,
+                n->value.namespace_access.variant,
+                symbols, typesdefs, types
+            );
             emit_path(
                 &n->value.namespace_access.path,
                 n->value.namespace_access.variant,
@@ -59,7 +133,7 @@ static void emit_type(Node* n, StringBuilder* out) {
             );
             return;
         case POINTER_TYPE_NODE:
-            emit_type(n->value.pointer_type.to, out);
+            WRITE_TYPE(n->value.pointer_type.to);
             WRITE_C('*');
             return;
         default:
@@ -67,16 +141,22 @@ static void emit_type(Node* n, StringBuilder* out) {
     }
 }
 
-static void emit_block(Block block, SymbolTable* symbols, StringBuilder* out);
+static void emit_block(
+    Block block, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
+);
 
 #define WRITE_NODE(n) { \
     WRITE_C('('); \
-    emit_node(n, symbols, out); \
+    emit_node(n, symbols, typesdefs, types, out); \
     WRITE_C(')'); \
 }
 
 static void emit_node(
-    Node* node, SymbolTable* symbols, StringBuilder* out
+    Node* node, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
 ) {
     switch(node->type) {
         // case UNIT_LITERAL_NODE:
@@ -102,7 +182,7 @@ static void emit_node(
             WRITE_S(node->value.variable.name);
             break;
         case VARIABLE_DECLARATION_NODE:
-            emit_type(node->value.variable_declaration.type, out);
+            WRITE_TYPE(node->value.variable_declaration.type);
             WRITE_C(' ');
             WRITE_S(node->value.variable_declaration.name);
             WRITE(" = ");
@@ -225,7 +305,7 @@ static void emit_node(
             break;
         case SIZE_OF_NODE:
             WRITE("sizeof(");
-            emit_type(node->value.size_of.t, out);
+            WRITE_TYPE(node->value.size_of.t);
             WRITE_C(')');
             break;
         case MEMBER_ACCESS_NODE:
@@ -251,7 +331,7 @@ static void emit_node(
             break;
         case TYPE_CONVERSION_NODE:
             WRITE_C('(');
-            emit_type(node->value.type_conversion.to, out);
+            WRITE_TYPE(node->value.type_conversion.to);
             WRITE(") ");
             WRITE_NODE(node->value.type_conversion.x);
             break;
@@ -266,16 +346,22 @@ static void emit_node(
             WRITE("if(");
             WRITE_NODE(node->value.if_else.condition);
             WRITE(") { ");
-            emit_block(node->value.if_else.if_body, symbols, out);
+            emit_block(
+                node->value.if_else.if_body, symbols, typesdefs, types, out
+            );
             WRITE(" } else { ");
-            emit_block(node->value.if_else.else_body, symbols, out);
+            emit_block(
+                node->value.if_else.else_body, symbols, typesdefs, types, out
+            );
             WRITE(" }");
             break;
         case WHILE_DO_NODE:
             WRITE("while(");
             WRITE_NODE(node->value.while_do.condition);
             WRITE(") { ");
-            emit_block(node->value.while_do.body, symbols, out);
+            emit_block(
+                node->value.while_do.body, symbols, typesdefs, types, out
+            );
             WRITE(" }");
             break;
         case CALL_NODE:
@@ -333,16 +419,22 @@ static void emit_node(
     }
 }
 
-static void emit_block(Block block, SymbolTable* symbols, StringBuilder* out) {
+static void emit_block(
+    Block block, SymbolTable* symbols, 
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
+) {
     for(size_t si = 0; si < block.length; si += 1) {
         if(si > 0) { WRITE_C(' '); }
-        emit_node(block.statements + si, symbols, out);
+        emit_node(block.statements + si, symbols, typesdefs, types, out);
         WRITE_C(';');
     }
 }
 
 static void emit_symbol_variant_pre(
-    Node* symbol, size_t variant, SymbolTable* symbols, StringBuilder* out
+    Node* symbol, size_t variant, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
 ) {
     switch(symbol->type) {
         case RECORD_NODE:
@@ -353,14 +445,14 @@ static void emit_symbol_variant_pre(
             WRITE(";\n");
             break;
         case FUNCTION_NODE:
-            emit_type(symbol->value.function.return_type, out);
+            WRITE_TYPE(symbol->value.function.return_type);
             WRITE_C(' ');
             emit_path(&symbol->value.function.path, variant, out);
             WRITE_C('(');
             size_t fun_argc = symbol->value.function.argc;
             for(size_t argi = 0; argi < fun_argc; argi += 1) {
                 if(argi > 0) { WRITE(", "); }
-                emit_type(symbol->value.function.argtypev + argi, out);
+                WRITE_TYPE(symbol->value.function.argtypev + argi);
                 WRITE_C(' ');
                 WRITE_S(symbol->value.function.argnamev[argi]);
             }
@@ -368,14 +460,14 @@ static void emit_symbol_variant_pre(
             break;
         case EXTERNAL_FUNCTION_NODE:
             WRITE("extern ");
-            emit_type(symbol->value.external_function.return_type, out);
+            WRITE_TYPE(symbol->value.external_function.return_type);
             WRITE_C(' ');
             WRITE_S(symbol->value.external_function.external_name);
             WRITE_C('(');
             size_t ext_fun_argc = symbol->value.external_function.argc;
             for(size_t argi = 0; argi < ext_fun_argc; argi += 1) {
                 if(argi > 0) { WRITE(", "); }
-                emit_type(symbol->value.external_function.argtypev + argi, out);
+                WRITE_TYPE(symbol->value.external_function.argtypev + argi);
                 WRITE_C(' ');
                 WRITE_S(symbol->value.external_function.argnamev[argi]);
             }
@@ -387,37 +479,30 @@ static void emit_symbol_variant_pre(
 }
 
 static void emit_symbol_variant(
-    Node* symbol, size_t variant, SymbolTable* symbols, StringBuilder* out
+    Node* symbol, size_t variant, SymbolTable* symbols,
+    StringBuilder* typesdefs, ArrayBuilder(RecordEntry)* types,
+    StringBuilder* out
 ) {
     switch(symbol->type) {
         case RECORD_NODE:
-            WRITE("typedef struct ");
-            emit_path(&symbol->value.record.path, variant, out);
-            WRITE(" { ");
-            for(size_t argi = 0; argi < symbol->value.record.argc; argi += 1) {
-                emit_type(symbol->value.record.argtypev + argi, out);
-                WRITE_C(' ');
-                WRITE_S(symbol->value.record.argnamev[argi]);
-                WRITE("; ");
-            }
-            WRITE("} ");
-            emit_path(&symbol->value.record.path, variant, out);
-            WRITE(";\n");
+            // fully declared when used
             break;
         case FUNCTION_NODE:
-            emit_type(symbol->value.function.return_type, out);
+            WRITE_TYPE(symbol->value.function.return_type);
             WRITE_C(' ');
             emit_path(&symbol->value.function.path, variant, out);
             WRITE_C('(');
             size_t fun_argc = symbol->value.function.argc;
             for(size_t argi = 0; argi < fun_argc; argi += 1) {
                 if(argi > 0) { WRITE(", "); }
-                emit_type(symbol->value.function.argtypev + argi, out);
+                WRITE_TYPE(symbol->value.function.argtypev + argi);
                 WRITE_C(' ');
                 WRITE_S(symbol->value.function.argnamev[argi]);
             }
             WRITE(") { ");
-            emit_block(symbol->value.function.body, symbols, out);
+            emit_block(
+                symbol->value.function.body, symbols, typesdefs, types, out
+            );
             WRITE(" }\n");
             break;
         case EXTERNAL_FUNCTION_NODE:
@@ -429,6 +514,8 @@ static void emit_symbol_variant(
 
 StringBuilder generate_code(SymbolTable* symbols, Namespace* main) {
     StringBuilder out = stringbuilder_new();
+    StringBuilder typesdefs = stringbuilder_new();
+    ArrayBuilder(RecordEntry) types = arraybuilder_new(RecordEntry)();
     stringbuilder_push_nt_string(&out,
         "\n"
         "// C output generated by the Nino bootstrap compiler\n"
@@ -443,27 +530,20 @@ StringBuilder generate_code(SymbolTable* symbols, Namespace* main) {
         Symbol* symbol = symbols->symbols + symboli;
         for(size_t vari = 0; vari < symbol->variant_count; vari += 1) {
             emit_symbol_variant_pre(
-                symbol->variants + vari, vari, symbols, &out
+                symbol->variants + vari, vari, symbols,
+                &typesdefs, &types, &out
             );
         }
     }
     stringbuilder_push_nt_string(&out, "\n");
-    for(size_t symboli = 0; symboli < symbols->count; symboli += 1) {
-        Symbol* symbol = symbols->symbols + symboli;
-        if(symbol->node.type != RECORD_NODE) { continue; }
-        for(size_t vari = 0; vari < symbol->variant_count; vari += 1) {
-            emit_symbol_variant(
-                symbol->variants + vari, vari, symbols, &out
-            );
-        }
-    }
+    stringbuilder_push(&out, typesdefs.length, typesdefs.buffer);
     stringbuilder_push_nt_string(&out, "\n");
     for(size_t symboli = 0; symboli < symbols->count; symboli += 1) {
         Symbol* symbol = symbols->symbols + symboli;
-        if(symbol->node.type == RECORD_NODE) { continue; }
         for(size_t vari = 0; vari < symbol->variant_count; vari += 1) {
             emit_symbol_variant(
-                symbol->variants + vari, vari, symbols, &out
+                symbol->variants + vari, vari, symbols,
+                &typesdefs, &types, &out
             );
         }
     }
@@ -476,5 +556,7 @@ StringBuilder generate_code(SymbolTable* symbols, Namespace* main) {
         stringbuilder_push_nt_string(&out, "    return 0;\n");
         stringbuilder_push_nt_string(&out, "}\n");
     }
+    stringbuilder_free(&typesdefs);
+    arraybuilder_discard(RecordEntry)(&types);
     return out;
 }
